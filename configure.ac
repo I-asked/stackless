@@ -347,6 +347,12 @@ then
 	*-*-cygwin*)
 		ac_sys_system=Cygwin
 		;;
+	*-*-psp*)
+		ac_sys_system=PSP
+		;;
+	powerpc-unknown-eabi*)
+		ac_sys_system=Wii
+		;;
 	*)
 		# for now, limit cross builds to known configurations
 		MACHDEP="unknown"
@@ -392,6 +398,12 @@ if test "$cross_compiling" = yes; then
 		;;
 	*-*-cygwin*)
 		_host_cpu=
+		;;
+	*-*-psp*)
+		_host_cpu=$host_cpu
+		;;
+	powerpc-unknown-eabi*)
+		_host_cpu=$host_cpu
 		;;
 	*)
 		# for now, limit cross builds to known configurations
@@ -584,6 +596,17 @@ AC_ARG_WITH(gcc,
 	case $ac_sys_system in
 	AIX*)   CC=${CC:-xlc_r}
 		without_gcc=;;
+	PSP)
+		LDFLAGS="$LDFLAGS -static"
+		LINKFORSHARED=" "
+	;;
+	Wii)
+		_arch_flags="-MMD -MP -mrvl -mcpu=750 -meabi -mhard-float"
+		CFLAGS="$CFLAGS -DGEKKO -DHW_RVL -D__WII__ -DGAMECUBE_WII $_arch_flags -Iogc/ -I$DEVKITPRO/libogc/include -I$DEVKITPRO/libogc/include/ogc"
+		LDFLAGS="$LDFLAGS -static"
+		LINKFORSHARED=" "
+		LIBS="-L$DEVKITPRO/libogc/lib/wii $_arch_flags $LIBS -laesnd -lwiiuse -lbte -lwiikeyboard -logc"
+	;;
 	BeOS*)
 		case $BE_HOST_CPU in
 		ppc)
@@ -1110,11 +1133,11 @@ then
 		# debug builds.
 		OPT="-g -O0 -Wall $STRICT_PROTO"
 	    else
-		OPT="-g $WRAP -O3 -Wall $STRICT_PROTO"
+		OPT="-g $WRAP -Oz -Wall $STRICT_PROTO"
 	    fi
 	    ;;
 	*)
-	    OPT="-O3 -Wall $STRICT_PROTO"
+	    OPT="-Oz -Wall $STRICT_PROTO"
 	    ;;
 	esac
 	case $ac_sys_system in
@@ -1600,6 +1623,7 @@ int main(){
 ])
 AC_MSG_RESULT($ac_cv_pthread_is_default)
 
+ac_cv_pthread_is_default=yes
 
 if test $ac_cv_pthread_is_default = yes 
 then
@@ -3099,6 +3123,12 @@ then
 	# Use dynload_next.c only on 10.2 and below, which don't have native dlopen()
 	Darwin/@<:@0156@:>@\..*) DYNLOADFILE="dynload_next.o";;
 	atheos*) DYNLOADFILE="dynload_atheos.o";;
+	PSP)
+		DYNLOADFILE="dynload_stub.o"
+		;;
+	Wii)
+		DYNLOADFILE="dynload_stub.o"
+		;;
 	*)
 	# use dynload_shlib.c and dlopen() if we have it; otherwise stub
 	# out any dynamic loading
@@ -3131,19 +3161,19 @@ AC_MSG_RESULT(MACHDEP_OBJS)
 # checks for library functions
 AC_CHECK_FUNCS(alarm setitimer getitimer bind_textdomain_codeset chown \
  clock confstr ctermid execv fchmod fchown fork fpathconf ftime ftruncate \
- gai_strerror getgroups getlogin getloadavg getpeername getpgid getpid \
+ gai_strerror getgroups getlogin getpeername getpgid getpid \
  getentropy \
- getpriority getresuid getresgid getpwent getspnam getspent getsid getwd \
+ getpriority getpwent getspnam getspent getsid getwd \
  initgroups kill killpg lchmod lchown lstat mkfifo mknod mktime mmap \
  mremap nice pathconf pause plock poll pthread_init \
  putenv readlink realpath \
  select sem_open sem_timedwait sem_getvalue sem_unlink setegid seteuid \
  setgid \
  setlocale setregid setreuid setsid setpgid setpgrp setuid setvbuf snprintf \
- setlocale setregid setreuid setresuid setresgid \
+ setlocale setregid setreuid \
  setsid setpgid setpgrp setuid setvbuf snprintf \
  sigaction siginterrupt sigrelse strftime \
- sysconf tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam tmpnam_r \
+ sysconf tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam \
  truncate uname unsetenv utimes waitpid wait3 wait4 wcscoll _getpty)
 
 # For some functions, having a definition is not sufficient, since
@@ -3397,7 +3427,7 @@ AC_CHECK_FUNCS(forkpty,,
 AC_CHECK_FUNCS(memmove)
 
 # check for long file support functions
-AC_CHECK_FUNCS(fseek64 fseeko fstatvfs ftell64 ftello statvfs)
+AC_CHECK_FUNCS(fseek64 fseeko ftell64 ftello statvfs)
 
 AC_REPLACE_FUNCS(dup2 getcwd strdup)
 AC_CHECK_FUNCS(getpgrp, 
@@ -4495,9 +4525,9 @@ int main()
 [ac_cv_working_tzset=no])])
 AC_MSG_RESULT($ac_cv_working_tzset)
 if test "$ac_cv_working_tzset" = yes
-then
-  AC_DEFINE(HAVE_WORKING_TZSET, 1,
-  [Define if tzset() actually switches the local timezone in a meaningful way.])
+then :
+#  AC_DEFINE(HAVE_WORKING_TZSET, 1,
+#  [Define if tzset() actually switches the local timezone in a meaningful way.])
 fi
 
 # Look for subsecond timestamps in struct stat

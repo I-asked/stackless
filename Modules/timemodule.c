@@ -803,7 +803,7 @@ inittimezone(PyObject *m) {
 
     And I'm lazy and hate C so nyer.
      */
-#if defined(HAVE_TZNAME) && !defined(__GLIBC__) && !defined(__CYGWIN__)
+#if 0
     tzset();
 #ifdef PYOS_OS2
     PyModule_AddIntConstant(m, "timezone", _timezone);

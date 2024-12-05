@@ -666,15 +666,15 @@ class PyBuildExt(build_ext):
             libs = ['bsd']
         exts.append( Extension('fcntl', ['fcntlmodule.c'], libraries=libs) )
         # pwd(3)
-        exts.append( Extension('pwd', ['pwdmodule.c']) )
+        #exts.append( Extension('pwd', ['pwdmodule.c']) )
         # grp(3)
-        exts.append( Extension('grp', ['grpmodule.c']) )
+        #exts.append( Extension('grp', ['grpmodule.c']) )
         # spwd, shadow passwords
-        if (config_h_vars.get('HAVE_GETSPNAM', False) or
-                config_h_vars.get('HAVE_GETSPENT', False)):
-            exts.append( Extension('spwd', ['spwdmodule.c']) )
-        else:
-            missing.append('spwd')
+        #if (config_h_vars.get('HAVE_GETSPNAM', False) or
+        #        config_h_vars.get('HAVE_GETSPENT', False)):
+        #    exts.append( Extension('spwd', ['spwdmodule.c']) )
+        #else:
+        #    missing.append('spwd')
 
         # select(2); not on ancient System V
         exts.append( Extension('select', ['selectmodule.c']) )
@@ -687,14 +687,14 @@ class PyBuildExt(build_ext):
         exts.append( Extension('cPickle', ['cPickle.c', '../Stackless/pickling/safe_pickle.c']) )
 
         # Memory-mapped files (also works on Win32).
-        if host_platform not in ['atheos']:
-            exts.append( Extension('mmap', ['mmapmodule.c']) )
-        else:
-            missing.append('mmap')
+        #if host_platform not in ['atheos']:
+        #    exts.append( Extension('mmap', ['mmapmodule.c']) )
+        #else:
+        #    missing.append('mmap')
 
         # Lance Ellinghaus's syslog module
         # syslog daemon interface
-        exts.append( Extension('syslog', ['syslogmodule.c']) )
+        #exts.append( Extension('syslog', ['syslogmodule.c']) )
 
         # George Neville-Neil's timing module:
         # Deprecated in PEP 4 http://www.python.org/peps/pep-0004.html
@@ -1339,12 +1339,12 @@ class PyBuildExt(build_ext):
         # Unix-only modules
         if host_platform not in ['win32']:
             # Steen Lumholt's termios module
-            exts.append( Extension('termios', ['termios.c']) )
+            #exts.append( Extension('termios', ['termios.c']) )
             # Jeremy Hylton's rlimit interface
-            if host_platform not in ['atheos']:
-                exts.append( Extension('resource', ['resource.c']) )
-            else:
-                missing.append('resource')
+            #if host_platform not in ['atheos']:
+            #    exts.append( Extension('resource', ['resource.c']) )
+            #else:
+            #    missing.append('resource')
 
             nis = self._detect_nis(inc_dirs, lib_dirs)
             if nis is not None:

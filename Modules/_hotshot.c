@@ -67,7 +67,8 @@ typedef struct timeval hs_time;
 #   elif defined (_POSIX_PATH_MAX)
 #       define PATH_MAX _POSIX_PATH_MAX
 #   else
-#       error "Need a defn. for PATH_MAX in _hotshot.c"
+#       define PATH_MAX 2048
+//#       error "Need a defn. for PATH_MAX in _hotshot.c"
 #   endif
 #endif
 

@@ -9,7 +9,7 @@
 #include <sys/file.h>
 #endif
 
-#include <sys/ioctl.h>
+//#include <sys/ioctl.h>
 #include <fcntl.h>
 #ifdef HAVE_STROPTS_H
 #include <stropts.h>

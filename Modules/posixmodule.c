@@ -141,26 +141,6 @@ corresponding Unix manual entries for more information on calls.");
 /* Everything needed is defined in PC/os2emx/pyconfig.h or vms/pyconfig.h */
 #else                   /* all other compilers */
 /* Unix functions that the configure script doesn't check for */
-#define HAVE_EXECV      1
-#define HAVE_FORK       1
-#if defined(__USLC__) && defined(__SCO_VERSION__)       /* SCO UDK Compiler */
-#define HAVE_FORK1      1
-#endif
-#define HAVE_GETCWD     1
-#define HAVE_GETEGID    1
-#define HAVE_GETEUID    1
-#define HAVE_GETGID     1
-#define HAVE_GETPPID    1
-#define HAVE_GETUID     1
-#define HAVE_KILL       1
-#define HAVE_OPENDIR    1
-#define HAVE_PIPE       1
-#ifndef __rtems__
-#define HAVE_POPEN      1
-#endif
-#define HAVE_SYSTEM     1
-#define HAVE_WAIT       1
-#define HAVE_TTYNAME    1
 #endif  /* PYOS_OS2 && PYCC_GCC && __VMS */
 #endif  /* _MSC_VER */
 #endif  /* __BORLANDC__ */
@@ -214,10 +194,10 @@ extern int pclose(FILE *);
 #ifdef HAVE_SYMLINK
 extern int symlink(const char *, const char *);
 #endif /* HAVE_SYMLINK */
+#endif /* !HAVE_UNISTD_H */
 #ifdef HAVE_LSTAT
 extern int lstat(const char *, struct stat *);
 #endif /* HAVE_LSTAT */
-#endif /* !HAVE_UNISTD_H */
 
 #endif /* !_MSC_VER */
 
@@ -658,6 +638,7 @@ convertenviron(void)
     if (environ == NULL)
         return d;
     /* This part ignores errors */
+#if 0
     for (e = environ; *e != NULL; e++) {
         PyObject *k;
         PyObject *v;
@@ -682,6 +663,7 @@ convertenviron(void)
         Py_DECREF(k);
         Py_DECREF(v);
     }
+#endif
 #if defined(PYOS_OS2)
     rc = DosQueryExtLIBPATH(buffer, BEGIN_LIBPATH);
     if (rc == NO_ERROR) { /* (not a type, envname is NOT 'BEGIN_LIBPATH') */
@@ -858,38 +840,13 @@ os2_error(int code)
 static PyObject *
 posix_fildes(PyObject *fdobj, int (*func)(int))
 {
-    int fd;
-    int res;
-    fd = PyObject_AsFileDescriptor(fdobj);
-    if (fd < 0)
-        return NULL;
-    if (!_PyVerify_fd(fd))
-        return posix_error();
-    Py_BEGIN_ALLOW_THREADS
-    res = (*func)(fd);
-    Py_END_ALLOW_THREADS
-    if (res < 0)
-        return posix_error();
-    Py_INCREF(Py_None);
-    return Py_None;
+    return posix_error();
 }
 
 static PyObject *
 posix_1str(PyObject *args, char *format, int (*func)(const char*))
 {
-    char *path1 = NULL;
-    int res;
-    if (!PyArg_ParseTuple(args, format,
-                          Py_FileSystemDefaultEncoding, &path1))
-        return NULL;
-    Py_BEGIN_ALLOW_THREADS
-    res = (*func)(path1);
-    Py_END_ALLOW_THREADS
-    if (res < 0)
-        return posix_error_with_allocated_filename(path1);
-    PyMem_Free(path1);
-    Py_INCREF(Py_None);
-    return Py_None;
+    return posix_error();
 }
 
 static PyObject *
@@ -2861,13 +2818,7 @@ Set the current numeric umask and return the previous umask.");
 static PyObject *
 posix_umask(PyObject *self, PyObject *args)
 {
-    int i;
-    if (!PyArg_ParseTuple(args, "i:umask", &i))
-        return NULL;
-    i = (int)umask(i);
-    if (i < 0)
-        return posix_error();
-    return PyInt_FromLong((long)i);
+    return posix_error();
 }
 
 
@@ -6101,6 +6052,13 @@ Set the groups of the current process to list.");
 static PyObject *
 posix_setgroups(PyObject *self, PyObject *groups)
 {
+#if 0
+#ifdef NGROUPS_MAX
+#define MAX_GROUPS NGROUPS_MAX
+#else
+    /* defined to be 16 on Solaris7, so this should be a small number */
+#define MAX_GROUPS 64
+#endif
     Py_ssize_t i, len;
     gid_t grouplist[MAX_GROUPS];
 
@@ -6139,6 +6097,9 @@ posix_setgroups(PyObject *self, PyObject *groups)
         return posix_error();
     Py_INCREF(Py_None);
     return Py_None;
+#else
+        return posix_error();
+#endif
 }
 #endif /* HAVE_SETGROUPS */
 
@@ -6691,17 +6652,7 @@ Return a duplicate of a file descriptor.");
 static PyObject *
 posix_dup(PyObject *self, PyObject *args)
 {
-    int fd;
-    if (!PyArg_ParseTuple(args, "i:dup", &fd))
-        return NULL;
-    if (!_PyVerify_fd(fd))
-        return posix_error();
-    Py_BEGIN_ALLOW_THREADS
-    fd = dup(fd);
-    Py_END_ALLOW_THREADS
-    if (fd < 0)
-        return posix_error();
-    return PyInt_FromLong((long)fd);
+    return posix_error();
 }
 
 
@@ -7467,7 +7418,7 @@ posix_WSTOPSIG(PyObject *self, PyObject *args)
 #endif /* HAVE_SYS_WAIT_H */
 
 
-#if defined(HAVE_FSTATVFS) && defined(HAVE_SYS_STATVFS_H)
+#if defined(HAVE_SYS_STATVFS_H)
 #ifdef _SCO_DS
 /* SCO OpenServer 5.0 and later requires _SVID3 before it reveals the
    needed definitions in sys/statvfs.h */
@@ -7514,6 +7465,8 @@ _pystatvfs_fromstructstatvfs(struct statvfs st) {
     return v;
 }
 
+#if defined(HAVE_FSTATVFS)
+
 PyDoc_STRVAR(posix_fstatvfs__doc__,
 "fstatvfs(fd) -> statvfs result\n\n\
 Perform an fstatvfs system call on the given fd.");
@@ -7534,6 +7487,7 @@ posix_fstatvfs(PyObject *self, PyObject *args)
 
     return _pystatvfs_fromstructstatvfs(st);
 }
+#endif
 #endif /* HAVE_FSTATVFS && HAVE_SYS_STATVFS_H */
 
 
