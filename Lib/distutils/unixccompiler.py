@@ -180,6 +180,7 @@ class UnixCCompiler(CCompiler):
                     linker = self.linker_exe[:]
                 else:
                     linker = self.linker_so[:]
+                    ld_args.extend(['-mrvl', 'main.c', '-L.', '-lpython2.7', '-lm', '-L/opt/devkitpro/libogc/lib/wii', '-logc'])
                 if target_lang == "c++" and self.compiler_cxx:
                     # skip over environment variable settings if /usr/bin/env
                     # is used to set up the linker's environment.

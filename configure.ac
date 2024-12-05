@@ -604,7 +604,7 @@ AC_ARG_WITH(gcc,
 		_arch_flags="-MMD -MP -mrvl -mcpu=750 -meabi -mhard-float"
 		CFLAGS="$CFLAGS -DGEKKO -DHW_RVL -D__WII__ -DGAMECUBE_WII $_arch_flags -Iogc/ -I$DEVKITPRO/libogc/include -I$DEVKITPRO/libogc/include/ogc"
 		LDFLAGS="$LDFLAGS -static"
-		LINKFORSHARED=" "
+		LINKFORSHARED=" -mrvl "
 		LIBS="-L$DEVKITPRO/libogc/lib/wii $_arch_flags $LIBS -laesnd -lwiiuse -lbte -lwiikeyboard -logc"
 	;;
 	BeOS*)
@@ -2326,7 +2326,17 @@ then
 	atheos*)
 		LDSHARED="gcc -shared"
 		LDCXXSHARED="g++ -shared";;
-	*)	LDSHARED="ld";;
+	Wii*)
+		LDSHARED='$(CC)'
+		LDCXXSHARED='$(CXX)'
+	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
+;;
+	PSP*)
+		LDSHARED='$(CC)'
+		LDCXXSHARED='$(CXX)';;
+	*)
+		LDSHARED='$(CC)'
+		LDCXXSHARED='$(CXX)';;
 	esac
 fi
 AC_MSG_RESULT($LDSHARED)
@@ -2366,6 +2376,8 @@ then
 		   *) CCSHARED="";;
 		   esac;;
 	atheos*) CCSHARED="-fPIC";;
+	Wii*) CCSHARED="-fPIC";;
+	PSP*) CCSHARED="-fPIC";;
 	esac
 fi
 AC_MSG_RESULT($CCSHARED)

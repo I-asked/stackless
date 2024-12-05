@@ -2,6 +2,9 @@
 
 # The purpose of this file is to conditionally enable certain modules
 # based on configure-time options.
+*static*
+
+math mathmodule.c _math.c
 
 # Threading
 @USE_THREAD_MODULE@thread threadmodule.c
