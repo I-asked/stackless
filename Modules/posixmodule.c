@@ -638,7 +638,6 @@ convertenviron(void)
     if (environ == NULL)
         return d;
     /* This part ignores errors */
-#if 0
     for (e = environ; *e != NULL; e++) {
         PyObject *k;
         PyObject *v;
@@ -663,7 +662,6 @@ convertenviron(void)
         Py_DECREF(k);
         Py_DECREF(v);
     }
-#endif
 #if defined(PYOS_OS2)
     rc = DosQueryExtLIBPATH(buffer, BEGIN_LIBPATH);
     if (rc == NO_ERROR) { /* (not a type, envname is NOT 'BEGIN_LIBPATH') */
