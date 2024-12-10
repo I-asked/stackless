@@ -10707,6 +10707,9 @@ printf "%s\n" "no" >&6; }
 		PKG_CONFIG=""
 	fi
 fi
+if test -z "$PKG_CONFIG"; then
+	as_fn_error $? "pkg-config not found" "$LINENO" 5
+fi
 
 # Check for use of the system expat library
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for --with-system-expat" >&5
@@ -17837,7 +17840,7 @@ do
 done
 
 
-SRCDIRS="Parser Objects Python Modules Stackless Stackless/core Stackless/module Stackless/pickling"
+SRCDIRS="Parser Objects Python Modules Modules/_io Stackless Stackless/core Stackless/module Stackless/pickling"
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for build directories" >&5
 printf %s "checking for build directories... " >&6; }
 for dir in $SRCDIRS; do

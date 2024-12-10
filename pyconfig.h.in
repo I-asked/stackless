@@ -929,10 +929,6 @@
 /* Define to 1 if you have the 'wcscoll' function. */
 #undef HAVE_WCSCOLL
 
-/* Define if tzset() actually switches the local timezone in a meaningful way.
-   */
-#undef HAVE_WORKING_TZSET
-
 /* Define if the zlib library has inflateCopy */
 #undef HAVE_ZLIB_COPY
 
@@ -1260,24 +1256,14 @@
 /* This must be defined on AIX systems to enable large file support. */
 #undef _LARGE_FILES
 
-/* Define to 1 if on MINIX. */
-#undef _MINIX
-
 /* Define on NetBSD to activate all library features */
 #undef _NETBSD_SOURCE
 
 /* Define _OSF_SOURCE to get the makedev macro. */
 #undef _OSF_SOURCE
 
-/* Define to 2 if the system does not provide POSIX.1 features except with
-   this defined. */
-#undef _POSIX_1_SOURCE
-
 /* Define to activate features from IEEE Stds 1003.1-2001 */
 #undef _POSIX_C_SOURCE
-
-/* Define to 1 if you need to in order for `stat' and other things to work. */
-#undef _POSIX_SOURCE
 
 /* Define if you have POSIX threads, and your system does not define that. */
 #undef _POSIX_THREADS
