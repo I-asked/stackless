@@ -119,14 +119,24 @@ The :mod:`urlparse` module defines the following functions:
    See section :ref:`urlparse-result-object` for more information on the result
    object.
 
+   Characters in the :attr:`netloc` attribute that decompose under NFKC
+   normalization (as used by the IDNA encoding) into any of ``/``, ``?``,
+   ``#``, ``@``, or ``:`` will raise a :exc:`ValueError`. If the URL is
+   decomposed before parsing, or is not a Unicode string, no error will be
+   raised.
+
    .. versionchanged:: 2.5
       Added attributes to return value.
 
    .. versionchanged:: 2.7
       Added IPv6 URL parsing capabilities.
 
+   .. versionchanged:: 2.7.17
+      Characters that affect netloc parsing under NFKC normalization will
+      now raise :exc:`ValueError`.
 
-.. function:: parse_qs(qs[, keep_blank_values[, strict_parsing]])
+
+.. function:: parse_qs(qs[, keep_blank_values[, strict_parsing[, max_num_fields]]])
 
    Parse a query string given as a string argument (data of type
    :mimetype:`application/x-www-form-urlencoded`).  Data are returned as a
@@ -143,14 +153,20 @@ The :mod:`urlparse` module defines the following functions:
    parsing errors.  If false (the default), errors are silently ignored.  If true,
    errors raise a :exc:`ValueError` exception.
 
+   The optional argument *max_num_fields* is the maximum number of fields to
+   read. If set, then throws a :exc:`ValueError` if there are more than
+   *max_num_fields* fields read.
+
    Use the :func:`urllib.urlencode` function to convert such dictionaries into
    query strings.
 
    .. versionadded:: 2.6
       Copied from the :mod:`cgi` module.
 
+   .. versionchanged:: 2.7.16
+      Added *max_num_fields* parameter.
 
-.. function:: parse_qsl(qs[, keep_blank_values[, strict_parsing]])
+.. function:: parse_qsl(qs[, keep_blank_values[, strict_parsing[, max_num_fields]]])
 
    Parse a query string given as a string argument (data of type
    :mimetype:`application/x-www-form-urlencoded`).  Data are returned as a list of
@@ -166,12 +182,18 @@ The :mod:`urlparse` module defines the following functions:
    parsing errors.  If false (the default), errors are silently ignored.  If true,
    errors raise a :exc:`ValueError` exception.
 
+   The optional argument *max_num_fields* is the maximum number of fields to
+   read. If set, then throws a :exc:`ValueError` if there are more than
+   *max_num_fields* fields read.
+
    Use the :func:`urllib.urlencode` function to convert such lists of pairs into
    query strings.
 
    .. versionadded:: 2.6
       Copied from the :mod:`cgi` module.
 
+   .. versionchanged:: 2.7.16
+      Added *max_num_fields* parameter.
 
 .. function:: urlunparse(parts)
 
@@ -220,10 +242,20 @@ The :mod:`urlparse` module defines the following functions:
    See section :ref:`urlparse-result-object` for more information on the result
    object.
 
+   Characters in the :attr:`netloc` attribute that decompose under NFKC
+   normalization (as used by the IDNA encoding) into any of ``/``, ``?``,
+   ``#``, ``@``, or ``:`` will raise a :exc:`ValueError`. If the URL is
+   decomposed before parsing, or is not a Unicode string, no error will be
+   raised.
+
    .. versionadded:: 2.2
 
    .. versionchanged:: 2.5
       Added attributes to return value.
+
+   .. versionchanged:: 2.7.17
+      Characters that affect netloc parsing under NFKC normalization will
+      now raise :exc:`ValueError`.
 
 
 .. function:: urlunsplit(parts)

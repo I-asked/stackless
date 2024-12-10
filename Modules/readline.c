@@ -792,8 +792,7 @@ on_completion_display_matches_hook(char **matches,
         s = PyString_FromString(matches[i+1]);
         if (s == NULL)
             goto error;
-        if (PyList_SetItem(m, i, s) == -1)
-            goto error;
+        PyList_SET_ITEM(m, i, s);
     }
 
     r = PyObject_CallFunction(completion_display_matches_hook,
@@ -1181,7 +1180,7 @@ call_readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
     q = p;
     p = PyMem_Malloc(n+2);
     if (p != NULL) {
-        strncpy(p, q, n);
+        memcpy(p, q, n);
         p[n] = '\n';
         p[n+1] = '\0';
     }

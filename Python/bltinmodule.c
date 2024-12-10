@@ -353,11 +353,12 @@ Fail_arg:
 }
 
 PyDoc_STRVAR(filter_doc,
-"filter(function or None, sequence) -> list, tuple, or string\n"
-"\n"
-"Return those items of sequence for which function(item) is true.  If\n"
-"function is None, return the items that are true.  If sequence is a tuple\n"
-"or string, return the same type, else return a list.");
+"filter(function or None, iterable) -> list, string or tuple\n\
+\n\
+Return a sequence yielding those items of iterable for which function(item)\n\
+is true. If function is None, return the items that are true.\n\
+If iterable is a string or a tuple, the result also has that type; otherwise\n\
+it is always a list.");
 
 static PyObject *
 builtin_format(PyObject *self, PyObject *args)
@@ -1789,7 +1790,7 @@ get_range_long_argument(PyObject *arg, const char *name)
 {
     PyObject *v;
     PyNumberMethods *nb;
-    if (PyInt_Check(arg) || PyLong_Check(arg)) {
+    if (_PyAnyInt_Check(arg)) {
         Py_INCREF(arg);
         return arg;
     }
@@ -1804,7 +1805,7 @@ get_range_long_argument(PyObject *arg, const char *name)
     v = nb->nb_int(arg);
     if (v == NULL)
         return NULL;
-    if (PyInt_Check(v) || PyLong_Check(v))
+    if (_PyAnyInt_Check(v))
         return v;
     Py_DECREF(v);
     PyErr_SetString(PyExc_TypeError,
@@ -2372,6 +2373,11 @@ builtin_sum(PyObject *self, PyObject *args)
             }
             /* Either overflowed or is not an int. Restore real objects and process normally */
             result = PyInt_FromLong(i_result);
+            if (result == NULL) {
+                Py_DECREF(item);
+                Py_DECREF(iter);
+                return NULL;
+            }
             temp = PyNumber_Add(result, item);
             Py_DECREF(result);
             Py_DECREF(item);
@@ -2410,6 +2416,11 @@ builtin_sum(PyObject *self, PyObject *args)
                 continue;
             }
             result = PyFloat_FromDouble(f_result);
+            if (result == NULL) {
+                Py_DECREF(item);
+                Py_DECREF(iter);
+                return NULL;
+            }
             temp = PyNumber_Add(result, item);
             Py_DECREF(result);
             Py_DECREF(item);

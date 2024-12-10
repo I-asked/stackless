@@ -9,6 +9,10 @@ import sysconfig
 import reindent
 import untabify
 
+try:
+    import stackless
+except ImportError:
+    stackless = None
 
 # Excluded directories which are copies of external libraries:
 # don't check their coding style
@@ -43,18 +47,10 @@ def status(message, modal=False, info=None):
     return decorated_fxn
 
 
-def mq_patches_applied():
-    """Check if there are any applied MQ patches."""
-    cmd = 'hg qapplied'
-    st = subprocess.Popen(cmd.split(),
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE)
-    try:
-        bstdout, _ = st.communicate()
-        return st.returncode == 0 and bstdout
-    finally:
-        st.stdout.close()
-        st.stderr.close()
+def is_stackless():
+    """Check if this is a Stackless Python source"""
+    return (stackless is not None and
+            os.path.exists(os.path.join(SRCDIR, 'Stackless')))
 
 
 def get_git_branch():
@@ -90,6 +86,8 @@ def get_base_branch():
         base_branch = "master"
     else:
         base_branch = "{0.major}.{0.minor}".format(version)
+    if is_stackless():
+        base_branch += "-slp"
     this_branch = get_git_branch()
     if this_branch is None or this_branch == base_branch:
         # Not on a git PR branch, so there's no base branch
@@ -101,19 +99,8 @@ def get_base_branch():
 @status("Getting the list of files that have been added/changed",
         info=lambda x: n_files_str(len(x)))
 def changed_files(base_branch=None):
-    """Get the list of changed or added files from Mercurial or git."""
-    if os.path.isdir(os.path.join(SRCDIR, '.hg')):
-        if base_branch is not None:
-            sys.exit('need a git checkout to check PR status')
-        cmd = 'hg status --added --modified --no-status'
-        if mq_patches_applied():
-            cmd += ' --rev qparent'
-        st = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
-        try:
-            filenames = [x.decode().rstrip() for x in st.stdout]
-        finally:
-            st.stdout.close()
-    elif os.path.exists(os.path.join(SRCDIR, '.git')):
+    """Get the list of changed or added files from git."""
+    if os.path.exists(os.path.join(SRCDIR, '.git')):
         # We just use an existence check here as:
         #  directory = normal git checkout/clone
         #  file = git worktree directory
@@ -138,7 +125,7 @@ def changed_files(base_branch=None):
         finally:
             st.stdout.close()
     else:
-        sys.exit('need a Mercurial or git checkout to get modified files')
+        sys.exit('need a git checkout to get modified files')
 
     filenames2 = []
     for filename in filenames:
@@ -221,10 +208,11 @@ def credit_given(file_paths):
     return os.path.join('Misc', 'ACKS') in file_paths
 
 
-@status("Misc/NEWS updated", modal=True)
+@status("Misc/NEWS.d updated with `blurb`", modal=True)
 def reported_news(file_paths):
-    """Check if Misc/NEWS has been changed."""
-    return os.path.join('Misc', 'NEWS') in file_paths
+    """Check if Misc/NEWS.d has been changed."""
+    return any(p.startswith(os.path.join('Misc', 'NEWS.d', 'next'))
+               for p in file_paths)
 
 
 def main():
@@ -234,8 +222,7 @@ def main():
     c_files = [fn for fn in file_paths if fn.endswith(('.c', '.h'))]
     doc_files = [fn for fn in file_paths if fn.startswith('Doc') and
                  fn.endswith(('.rst', '.inc'))]
-    misc_files = {os.path.join('Misc', 'ACKS'), os.path.join('Misc', 'NEWS')}\
-            & set(file_paths)
+    misc_files = {p for p in file_paths if p.startswith('Misc')}
     # PEP 8 whitespace rules enforcement.
     normalize_whitespace(python_files)
     # C rules enforcement.

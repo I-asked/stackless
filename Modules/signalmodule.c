@@ -95,13 +95,6 @@ static PyObject *DefaultHandler;
 static PyObject *IgnoreHandler;
 static PyObject *IntHandler;
 
-/* On Solaris 8, gcc will produce a warning that the function
-   declaration is not a prototype. This is caused by the definition of
-   SIG_DFL as (void (*)())0; the correct declaration would have been
-   (void (*)(int))0. */
-
-static PyOS_sighandler_t old_siginthandler = SIG_DFL;
-
 #ifdef HAVE_GETITIMER
 static PyObject *ItimerError;
 
@@ -180,8 +173,10 @@ trip_signal(int sig_num)
        cleared in PyErr_CheckSignals() before .tripped. */
     is_tripped = 1;
     Py_AddPendingCall(checksignals_witharg, NULL);
-    if (wakeup_fd != -1)
-        write(wakeup_fd, "\0", 1);
+    if (wakeup_fd != -1) {
+        int rc = write(wakeup_fd, "\0", 1);
+        (void)rc;
+    }
 }
 
 static void
@@ -629,7 +624,7 @@ initsignal(void)
         /* Install default int handler */
         Py_INCREF(IntHandler);
         Py_SETREF(Handlers[SIGINT].func, IntHandler);
-        old_siginthandler = PyOS_setsig(SIGINT, signal_handler);
+        PyOS_setsig(SIGINT, signal_handler);
     }
 
 #ifdef SIGHUP
@@ -872,14 +867,11 @@ finisignal(void)
     int i;
     PyObject *func;
 
-    PyOS_setsig(SIGINT, old_siginthandler);
-    old_siginthandler = SIG_DFL;
-
     for (i = 1; i < NSIG; i++) {
         func = Handlers[i].func;
         Handlers[i].tripped = 0;
         Handlers[i].func = NULL;
-        if (i != SIGINT && func != NULL && func != Py_None &&
+        if (func != NULL && func != Py_None &&
             func != DefaultHandler && func != IgnoreHandler)
             PyOS_setsig(i, SIG_DFL);
         Py_XDECREF(func);

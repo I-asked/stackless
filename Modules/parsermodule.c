@@ -121,10 +121,10 @@ node2tuple(node *n,                     /* node to convert               */
         if (result != NULL) {
             (void) addelem(result, 0, PyInt_FromLong(TYPE(n)));
             (void) addelem(result, 1, PyString_FromString(STR(n)));
-            if (lineno == 1)
+            if (lineno)
                 (void) addelem(result, 2, PyInt_FromLong(n->n_lineno));
-            if (col_offset == 1)
-                (void) addelem(result, 3, PyInt_FromLong(n->n_col_offset));
+            if (col_offset)
+                (void) addelem(result, 2 + lineno, PyInt_FromLong(n->n_col_offset));
         }
         return (result);
     }
@@ -1055,14 +1055,15 @@ validate_numnodes(node *n, int num, const char *const name)
 static int
 validate_terminal(node *terminal, int type, char *string)
 {
-    int res = (validate_ntype(terminal, type)
-               && ((string == 0) || (strcmp(string, STR(terminal)) == 0)));
-
-    if (!res && !PyErr_Occurred()) {
+    if (!validate_ntype(terminal, type)) {
+        return 0;
+    }
+    if (string != NULL && strcmp(string, STR(terminal)) != 0) {
         PyErr_Format(parser_error,
                      "Illegal terminal: expected \"%s\"", string);
+        return 0;
     }
-    return (res);
+    return 1;
 }
 
 

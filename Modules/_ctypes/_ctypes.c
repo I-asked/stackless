@@ -547,7 +547,7 @@ static PyObject *
 CDataType_from_address(PyObject *type, PyObject *value)
 {
     void *buf;
-    if (!PyInt_Check(value) && !PyLong_Check(value)) {
+    if (!_PyAnyInt_Check(value)) {
         PyErr_SetString(PyExc_TypeError,
                         "integer expected");
         return NULL;
@@ -691,7 +691,7 @@ CDataType_in_dll(PyObject *type, PyObject *args)
     obj = PyObject_GetAttrString(dll, "_handle");
     if (!obj)
         return NULL;
-    if (!PyInt_Check(obj) && !PyLong_Check(obj)) {
+    if (!_PyAnyInt_Check(obj)) {
         PyErr_SetString(PyExc_TypeError,
                         "the _handle attribute of the second argument must be an integer");
         Py_DECREF(obj);
@@ -1216,6 +1216,10 @@ CharArray_set_raw(CDataObject *self, PyObject *value)
 #if (PY_VERSION_HEX >= 0x02060000)
     Py_buffer view = { 0 };
 #endif
+    if (value == NULL) {
+        PyErr_SetString(PyExc_AttributeError, "cannot delete attribute");
+        return -1;
+    }
     if (PyBuffer_Check(value)) {
         size = Py_TYPE(value)->tp_as_buffer->bf_getreadbuffer(value, 0, (void *)&ptr);
         if (size < 0)
@@ -1460,24 +1464,36 @@ PyCArrayType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     PyTypeObject *result;
     StgDictObject *stgdict;
     StgDictObject *itemdict;
-    PyObject *proto;
+    PyObject *proto, *length_attr;
     PyObject *typedict;
-    long length;
-
+    Py_ssize_t length;
     Py_ssize_t itemsize, itemalign;
 
     typedict = PyTuple_GetItem(args, 2);
     if (!typedict)
         return NULL;
 
-    proto = PyDict_GetItemString(typedict, "_length_"); /* Borrowed ref */
-    if (!proto || !PyInt_Check(proto)) {
+    length_attr = PyDict_GetItemString(typedict, "_length_"); /* Borrowed ref */
+    if (!length_attr || !_PyAnyInt_Check(length_attr)) {
         PyErr_SetString(PyExc_AttributeError,
                         "class must define a '_length_' attribute, "
                         "which must be a positive integer");
         return NULL;
     }
-    length = PyInt_AS_LONG(proto);
+    if (PyInt_Check(length_attr)) {
+        length = PyInt_AS_LONG(length_attr);
+    }
+    else {
+        assert(PyLong_Check(length_attr));
+        length = PyLong_AsSsize_t(length_attr);
+        if (length == -1 && PyErr_Occurred()) {
+            if (PyErr_ExceptionMatches(PyExc_OverflowError)) {
+                PyErr_SetString(PyExc_OverflowError,
+                                "The '_length_' attribute is too large");
+            }
+            return NULL;
+        }
+    }
 
     proto = PyDict_GetItemString(typedict, "_type_"); /* Borrowed ref */
     if (!proto) {
@@ -1518,9 +1534,10 @@ PyCArrayType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     }
 
     itemsize = itemdict->size;
-    if (length * itemsize < 0) {
+    if (itemsize != 0 && length > PY_SSIZE_T_MAX / itemsize) {
         PyErr_SetString(PyExc_OverflowError,
                         "array too large");
+        Py_DECREF(stgdict);
         return NULL;
     }
 
@@ -1543,8 +1560,10 @@ PyCArrayType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* create the new instance (which is a class,
        since we are a metatype!) */
     result = (PyTypeObject *)PyType_Type.tp_new(type, args, kwds);
-    if (result == NULL)
+    if (result == NULL) {
+        Py_DECREF(stgdict);
         return NULL;
+    }
 
     /* replace the class dict by our updated spam dict */
     if (-1 == PyDict_Update((PyObject *)stgdict, result->tp_dict)) {
@@ -1558,12 +1577,16 @@ PyCArrayType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
        A permanent annoyance: char arrays are also strings!
     */
     if (itemdict->getfunc == _ctypes_get_fielddesc("c")->getfunc) {
-        if (-1 == add_getset(result, CharArray_getsets))
+        if (-1 == add_getset(result, CharArray_getsets)) {
+            Py_DECREF(result);
             return NULL;
+        }
 #ifdef CTYPES_UNICODE
     } else if (itemdict->getfunc == _ctypes_get_fielddesc("u")->getfunc) {
-        if (-1 == add_getset(result, WCharArray_getsets))
+        if (-1 == add_getset(result, WCharArray_getsets)) {
+            Py_DECREF(result);
             return NULL;
+        }
 #endif
     }
 
@@ -1779,7 +1802,7 @@ c_void_p_from_param(PyObject *type, PyObject *value)
     }
     /* Should probably allow buffer interface as well */
 /* int, long */
-    if (PyInt_Check(value) || PyLong_Check(value)) {
+    if (_PyAnyInt_Check(value)) {
         PyCArgObject *parg;
         struct fielddesc *fd = _ctypes_get_fielddesc("P");
 
@@ -2772,16 +2795,18 @@ static PyObject *
 PyCData_reduce(PyObject *_self, PyObject *args)
 {
     CDataObject *self = (CDataObject *)_self;
+    PyObject *dict;
 
     if (PyObject_stgdict(_self)->flags & (TYPEFLAG_ISPOINTER|TYPEFLAG_HASPOINTER)) {
         PyErr_SetString(PyExc_ValueError,
                         "ctypes objects containing pointers cannot be pickled");
         return NULL;
     }
-    return Py_BuildValue("O(O(NN))",
-                         _unpickle,
-                         Py_TYPE(_self),
-                         PyObject_GetAttrString(_self, "__dict__"),
+    dict = PyObject_GetAttrString(_self, "__dict__");
+    if (dict == NULL) {
+        return NULL;
+    }
+    return Py_BuildValue("O(O(NN))", _unpickle, Py_TYPE(_self), dict,
                          PyString_FromStringAndSize(self->b_ptr, self->b_size));
 }
 
@@ -3419,7 +3444,7 @@ static int
 _get_name(PyObject *obj, char **pname)
 {
 #ifdef MS_WIN32
-    if (PyInt_Check(obj) || PyLong_Check(obj)) {
+    if (_PyAnyInt_Check(obj)) {
         /* We have to use MAKEINTRESOURCEA for Windows CE.
            Works on Windows as well, of course.
         */
@@ -3469,7 +3494,7 @@ PyCFuncPtr_FromDll(PyTypeObject *type, PyObject *args, PyObject *kwds)
         Py_DECREF(ftuple);
         return NULL;
     }
-    if (!PyInt_Check(obj) && !PyLong_Check(obj)) {
+    if (!_PyAnyInt_Check(obj)) {
         PyErr_SetString(PyExc_TypeError,
                         "the _handle attribute of the second argument must be an integer");
         Py_DECREF(ftuple);
@@ -3514,20 +3539,23 @@ PyCFuncPtr_FromDll(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 #endif
-    Py_INCREF(dll); /* for KeepRef */
-    Py_DECREF(ftuple);
-    if (!_validate_paramflags(type, paramflags))
+    if (!_validate_paramflags(type, paramflags)) {
+        Py_DECREF(ftuple);
         return NULL;
+    }
 
     self = (PyCFuncPtrObject *)GenericPyCData_new(type, args, kwds);
-    if (!self)
+    if (!self) {
+        Py_DECREF(ftuple);
         return NULL;
+    }
 
     Py_XINCREF(paramflags);
     self->paramflags = paramflags;
 
     *(void **)self->b_ptr = address;
-
+    Py_INCREF(dll);
+    Py_DECREF(ftuple);
     if (-1 == KeepRef((CDataObject *)self, 0, dll)) {
         Py_DECREF((PyObject *)self);
         return NULL;
@@ -3600,8 +3628,7 @@ PyCFuncPtr_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 #endif
 
     if (1 == PyTuple_GET_SIZE(args)
-        && (PyInt_Check(PyTuple_GET_ITEM(args, 0))
-        || PyLong_Check(PyTuple_GET_ITEM(args, 0)))) {
+        && _PyAnyInt_Check(PyTuple_GET_ITEM(args, 0))) {
         CDataObject *ob;
         void *ptr = PyLong_AsVoidPtr(PyTuple_GET_ITEM(args, 0));
         if (ptr == NULL && PyErr_Occurred())

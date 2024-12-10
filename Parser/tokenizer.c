@@ -656,9 +656,14 @@ translate_newlines(const char *s, int exec_input, struct tok_state *tok) {
     }
     *current = '\0';
     final_length = current - buf + 1;
-    if (final_length < needed_length && final_length)
+    if (final_length < needed_length && final_length) {
         /* should never fail */
-        buf = PyMem_REALLOC(buf, final_length);
+        char* result = PyMem_REALLOC(buf, final_length);
+        if (result == NULL) {
+            PyMem_FREE(buf);
+        }
+        buf = result;
+    }
     return buf;
 }
 
@@ -1636,6 +1641,8 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
                                    "<> not supported in 3.x; use !=",
                                    tok->filename, tok->lineno,
                                    NULL, NULL)) {
+                tok->done = E_ERROR;
+                tok->cur = tok->inp;
                 return ERRORTOKEN;
             }
         }
@@ -1679,6 +1686,11 @@ int
 PyTokenizer_Get(struct tok_state *tok, char **p_start, char **p_end)
 {
     int result = tok_get(tok, p_start, p_end);
+    if (tok->fp && ferror(tok->fp)) {
+        clearerr(tok->fp);
+        result = ERRORTOKEN;
+        tok->done = E_IO;
+    }
     if (tok->decoding_erred) {
         result = ERRORTOKEN;
         tok->done = E_DECODE;

@@ -35,14 +35,16 @@ _getbytevalue(PyObject* arg, int *value)
         *value = Py_CHARMASK(((PyBytesObject*)arg)->ob_sval[0]);
         return 1;
     }
-    else if (PyInt_Check(arg) || PyLong_Check(arg)) {
+    else if (_PyAnyInt_Check(arg)) {
         face_value = PyLong_AsLong(arg);
     }
     else {
         PyObject *index = PyNumber_Index(arg);
         if (index == NULL) {
-            PyErr_Format(PyExc_TypeError,
-                         "an integer or string of size 1 is required");
+            if (PyErr_ExceptionMatches(PyExc_TypeError)) {
+                PyErr_Format(PyExc_TypeError,
+                             "an integer or string of size 1 is required");
+            }
             return 0;
         }
         face_value = PyLong_AsLong(index);
@@ -852,7 +854,7 @@ bytearray_init(PyByteArrayObject *self, PyObject *args, PyObject *kwds)
     /* Is it an int? */
     count = PyNumber_AsSsize_t(arg, PyExc_OverflowError);
     if (count == -1 && PyErr_Occurred()) {
-        if (PyErr_ExceptionMatches(PyExc_OverflowError))
+        if (!PyErr_ExceptionMatches(PyExc_TypeError))
             return -1;
         PyErr_Clear();
     }
@@ -1025,14 +1027,6 @@ bytearray_repr(PyByteArrayObject *self)
 static PyObject *
 bytearray_str(PyObject *op)
 {
-#if 0
-    if (Py_BytesWarningFlag) {
-        if (PyErr_WarnEx(PyExc_BytesWarning,
-                 "str() on a bytearray instance", 1))
-            return NULL;
-    }
-    return bytearray_repr((PyByteArrayObject*)op);
-#endif
     return PyBytes_FromStringAndSize(((PyByteArrayObject*)op)->ob_bytes, Py_SIZE(op));
 }
 
@@ -1057,7 +1051,7 @@ bytearray_richcompare(PyObject *self, PyObject *other, int op)
     if (rc) {
         if (Py_BytesWarningFlag && op == Py_EQ) {
             if (PyErr_WarnEx(PyExc_BytesWarning,
-                            "Comparison between bytearray and string", 1))
+                            "Comparison between bytearray and unicode", 1))
                 return NULL;
         }
 

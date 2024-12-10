@@ -182,12 +182,15 @@ PyStackless_Schedule(PyObject *retval, int remove)
 {
     STACKLESS_GETARG();
     PyThreadState *ts = PyThreadState_GET();
-    PyTaskletObject *prev = ts->st.current, *next = prev->next;
+    PyTaskletObject *prev = ts->st.current, *next;
     PyObject *tmpval, *ret = NULL;
     int switched, fail;
 
-    if (ts->st.main == NULL) return PyStackless_Schedule_M(retval, remove);
+    if (ts->st.main == NULL)
+        return PyStackless_Schedule_M(retval, remove);
 
+    assert(prev);
+    next = prev->next;
     /* make sure we hold a reference to the previous tasklet.
      * this will be decrefed after the switch is complete
      */
@@ -528,7 +531,9 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
         /* we failed to switch */
         PyTaskletObject *undo = pop_watchdog(ts);
         assert(undo == old_current);
-        slp_current_unremove(undo);
+        /* In case of an error, we don't know the state */
+        if (undo->next == NULL)
+            slp_current_unremove(undo);
         return NULL;
     }
 
@@ -940,6 +945,7 @@ PyDoc_STRVAR(test_cframe_nr__doc__,
 "test_cframe_nr(switches) -- a builtin testing function that does nothing\n\
 but soft tasklet switching. The function will call PyStackless_Schedule_nr() for switches\n\
 times and then finish.\n\
+All remaining arguments are intentionally undocumented. Don't use them!\n\
 Usage: Cf. test_cframe().");
 
 static
@@ -965,7 +971,6 @@ test_cframe_nr_loop(PyFrameObject *f, int exc, PyObject *retval)
     }
 exit_test_cframe_nr_loop:
     SLP_STORE_NEXT_FRAME(ts, cf->f_back);
-    Py_DECREF(cf);
     return retval;
 }
 
@@ -973,19 +978,29 @@ static
 PyObject *
 test_cframe_nr(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *argnames[] = {"switches", NULL};
+    static char *argnames[] = {"switches", "cstate_add_addr", NULL};
     PyThreadState *ts = PyThreadState_GET();
     PyCFrameObject *cf;
     long switches;
+    PyObject *cstack = NULL;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "l:test_cframe_nr",
-                                     argnames, &switches))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "l|O!:test_cframe_nr",
+                                     argnames, &switches, &PyCStack_Type, &cstack))
         return NULL;
+    if (cstack) {
+        /* Manipulate the startaddr of a cstack to make it (in)valid.
+         * This can be used to provoke switching errors. Without such a functionality,
+         * it is not possible to test the error handling code for switching errors.
+         */
+        ((PyCStackObject*)cstack)->startaddr += switches;
+        Py_RETURN_NONE;
+    }
     cf = slp_cframe_new(test_cframe_nr_loop, 1);
     if (cf == NULL)
         return NULL;
     cf->n = switches;
     SLP_STORE_NEXT_FRAME(ts, (PyFrameObject *) cf);
+    Py_DECREF(cf);
     Py_INCREF(Py_None);
     return STACKLESS_PACK(ts, Py_None);
 }
@@ -1129,6 +1144,96 @@ static int init_test_nostacklesscalltype(void)
         return -1;
     return 0;
 }
+
+
+PyDoc_STRVAR(test_PyEval_EvalFrameEx__doc__,
+"test_PyEval_EvalFrameEx(code, globals, args=()) -- a builtin testing function.\n\
+This function tests the C-API function PyEval_EvalFrameEx(), which is not used\n\
+by Stackless Python.\n\
+The function creates a frame from code, globals and args and executes the frame.");
+
+static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObject *kwds) {
+    static char *kwlist[] = {"code", "globals", "args", "alloca", "throw", "oldcython",
+                             "code2", NULL};
+    PyThreadState *tstate = PyThreadState_GET();
+    PyCodeObject *co, *code2 = NULL;
+    PyObject *globals, *co_args = NULL;
+    Py_ssize_t alloca_size = 0;
+    PyObject *exc = NULL;
+    PyObject *oldcython = NULL;
+    PyFrameObject *f;
+    PyObject *result = NULL;
+    void *p;
+    Py_ssize_t na;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|O!nOO!O!:test_PyEval_EvalFrameEx", kwlist,
+            &PyCode_Type, &co, &PyDict_Type, &globals, &PyTuple_Type, &co_args, &alloca_size,
+            &exc, &PyBool_Type, &oldcython, &PyCode_Type, &code2))
+        return NULL;
+    if (exc && !PyExceptionInstance_Check(exc)) {
+        PyErr_SetString(PyExc_TypeError, "exc must be an exception instance");
+        return NULL;
+    }
+    p = alloca(alloca_size);
+    assert(globals != NULL);
+    assert(tstate != NULL);
+    na = PyTuple_Size(co->co_freevars);
+    if (na == -1)
+        return NULL;
+    if (na > 0) {
+        PyErr_Format(PyExc_ValueError, "code requires cell variables");
+        return NULL;
+    }
+    f = PyFrame_New(tstate, co, globals, NULL);
+    if (f == NULL) {
+        return NULL;
+    }
+    if (co_args) {
+        PyObject **fastlocals;
+        Py_ssize_t i;
+        na = PyTuple_Size(co_args);
+        if (na == -1)
+            goto exit;
+        if (na > co->co_argcount) {
+            PyErr_Format(PyExc_ValueError, "too many items in tuple 'args'");
+            goto exit;
+        }
+        fastlocals = f->f_localsplus;
+        if (oldcython == Py_True) {
+            /* Use the f_localsplus offset from regular C-Python. Old versions of cython used to
+             * access f_localplus directly. Current versions compute the field offset for
+             * f_localsplus at run-time.
+             */
+            fastlocals--;
+        }
+        for (i = 0; i < na; i++) {
+            PyObject *arg = PyTuple_GetItem(co_args, i);
+            if (arg == NULL) {
+                goto exit;
+            }
+            Py_INCREF(arg);
+            fastlocals[i] = arg;
+        }
+        if (alloca_size > 0 && na > 0) {
+            Py_SETREF(fastlocals[0], PyLong_FromVoidPtr(p));
+        }
+    }
+    if (exc) {
+        PyErr_SetObject(PyExceptionInstance_Class(exc), exc);
+    }
+    if (code2) {
+        Py_INCREF(code2);
+        Py_SETREF(f->f_code, code2);
+    }
+    result = PyEval_EvalFrameEx(f, exc != NULL);
+    /* result = Py_None; Py_INCREF(Py_None); */
+exit:
+    ++tstate->recursion_depth;
+    Py_DECREF(f);
+    --tstate->recursion_depth;
+    return result;
+}
+
 
 /******************************************************
 
@@ -1601,6 +1706,8 @@ static PyMethodDef stackless_methods[] = {
     test_outside__doc__},
     {"test_cstate",                 (PCF)test_cstate,           METH_O,
     test_cstate__doc__},
+    {"test_PyEval_EvalFrameEx",     (PCF)test_PyEval_EvalFrameEx, METH_VARARGS | METH_KEYWORDS,
+    test_PyEval_EvalFrameEx__doc__},
     {"set_channel_callback",        (PCF)set_channel_callback,  METH_O,
      set_channel_callback__doc__},
     {"get_channel_callback",        (PCF)get_channel_callback,  METH_NOARGS,

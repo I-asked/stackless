@@ -1022,7 +1022,7 @@ PyLong_AsUnsignedLongLongMask(PyObject *vv)
 
     if (vv == NULL || !PyLong_Check(vv)) {
         PyErr_BadInternalCall();
-        return (unsigned long) -1;
+        return (unsigned PY_LONG_LONG) -1;
     }
     v = (PyLongObject *)vv;
     i = Py_SIZE(v);
@@ -1722,7 +1722,7 @@ PyLong_FromString(char *str, char **pend, int base)
 
     if ((base != 0 && base < 2) || base > 36) {
         PyErr_SetString(PyExc_ValueError,
-                        "long() arg 2 must be >= 2 and <= 36");
+                        "long() base must be >= 2 and <= 36, or 0");
         return NULL;
     }
     while (*str != '\0' && isspace(Py_CHARMASK(*str)))

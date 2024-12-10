@@ -199,6 +199,7 @@ class PosixTester(unittest.TestCase):
     def test_fdopen_directory(self):
         try:
             fd = os.open('.', os.O_RDONLY)
+            self.addCleanup(os.close, fd)
         except OSError as e:
             self.assertEqual(e.errno, errno.EACCES)
             self.skipTest("system cannot open directories")
@@ -555,7 +556,11 @@ class PosixTester(unittest.TestCase):
                     )
                     if quirky_platform:
                         expected_errno = errno.ERANGE
-                    self.assertEqual(e.errno, expected_errno)
+                    if 'darwin' in sys.platform:
+                        # macOS 10.15 may return errno.ENOENT instead
+                        self.assertIn(e.errno, (errno.ENOENT, errno.ENAMETOOLONG))
+                    else:
+                        self.assertEqual(e.errno, expected_errno)
                 finally:
                     os.chdir('..')
                     os.rmdir(dirname)

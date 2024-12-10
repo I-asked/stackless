@@ -267,6 +267,8 @@ make_initial_stub(void)
     return result;
 }
 
+/* a write only variable used to prevent overly optimisation */
+intptr_t *global_goobledigoobs;
 static PyObject *
 climb_stack_and_eval_frame(PyFrameObject *f)
 {
@@ -286,6 +288,10 @@ climb_stack_and_eval_frame(PyFrameObject *f)
         goobledigoobs = alloca(needed * sizeof(intptr_t));
         if (goobledigoobs == NULL)
             return NULL;
+        /* hinder the compiler to optimise away 
+           goobledigoobs and the alloca call. 
+           This happens with gcc 4.7.x and -O2 */
+        global_goobledigoobs = goobledigoobs;
     }
     return slp_eval_frame(f);
 }
@@ -911,7 +917,7 @@ eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
     SLP_FRAME_EXECFUNC_DECREF(cf);
     slp_transfer_return(cst);
     /* should never come here */
-    assert(0);
+    Py_FatalError("Return from stack spilling failed.");
 fatal:
     SLP_STORE_NEXT_FRAME(ts, cf->f_back);
     return NULL;
@@ -1153,7 +1159,7 @@ unwind_repr(PyObject *op)
 {
     return PyString_FromString(
         "The invisible unwind token. If you ever should see this,\n"
-        "please report the error to https://bitbucket.org/stackless-dev/stackless/issues"
+        "please report the error to https://github.com/stackless-dev/stackless/issues"
     );
 }
 

@@ -156,6 +156,28 @@ PyThread__init_thread(void)
  * Thread support.
  */
 
+/* bpo-33015: pythread_callback struct and pythread_wrapper() cast
+   "void func(void *)" to "void* func(void *)": always return NULL.
+
+   PyThread_start_new_thread() uses "void func(void *)" type, whereas
+   pthread_create() requires a void* return value. */
+typedef struct {
+    void (*func) (void *);
+    void *arg;
+} pythread_callback;
+
+static void *
+pythread_wrapper(void *arg)
+{
+    /* copy func and func_arg and free the temporary structure */
+    pythread_callback *callback = arg;
+    void (*func)(void *) = callback->func;
+    void *func_arg = callback->arg;
+    free(arg);
+
+    func(func_arg);
+    return NULL;
+}
 
 long
 PyThread_start_new_thread(void (*func)(void *), void *arg)
@@ -191,21 +213,31 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
     pthread_attr_setscope(&attrs, PTHREAD_SCOPE_SYSTEM);
 #endif
 
+    pythread_callback *callback = malloc(sizeof(pythread_callback));
+
+    if (callback == NULL) {
+        return -1;
+    }
+
+    callback->func = func;
+    callback->arg = arg;
+
     status = pthread_create(&th,
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
                              &attrs,
 #else
                              (pthread_attr_t*)NULL,
 #endif
-                             (void* (*)(void *))func,
-                             (void *)arg
-                             );
+                             pythread_wrapper, callback);
 
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
     pthread_attr_destroy(&attrs);
 #endif
-    if (status != 0)
+
+    if (status != 0) {
+        free(callback);
         return -1;
+    }
 
     pthread_detach(th);
 
@@ -398,11 +430,14 @@ PyThread_free_lock(PyThread_type_lock lock)
     (void) error; /* silence unused-but-set-variable warning */
     dprintf(("PyThread_free_lock(%p) called\n", lock));
 
-    status = pthread_mutex_destroy( &thelock->mut );
-    CHECK_STATUS("pthread_mutex_destroy");
-
+    /* some pthread-like implementations tie the mutex to the cond
+     * and must have the cond destroyed first.
+     */
     status = pthread_cond_destroy( &thelock->lock_released );
     CHECK_STATUS("pthread_cond_destroy");
+
+    status = pthread_mutex_destroy( &thelock->mut );
+    CHECK_STATUS("pthread_mutex_destroy");
 
     free((void *)thelock);
 }
@@ -465,12 +500,12 @@ PyThread_release_lock(PyThread_type_lock lock)
 
     thelock->locked = 0;
 
-    status = pthread_mutex_unlock( &thelock->mut );
-    CHECK_STATUS("pthread_mutex_unlock[3]");
-
     /* wake up someone (anyone, if any) waiting on the lock */
     status = pthread_cond_signal( &thelock->lock_released );
     CHECK_STATUS("pthread_cond_signal");
+
+    status = pthread_mutex_unlock( &thelock->mut );
+    CHECK_STATUS("pthread_mutex_unlock[3]");
 }
 
 #endif /* USE_SEMAPHORES */

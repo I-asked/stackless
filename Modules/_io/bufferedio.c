@@ -1363,6 +1363,7 @@ _bufferedreader_read_all(buffered *self)
         res = buffered_flush_and_rewind_unlocked(self);
         if (res == NULL) {
             Py_DECREF(chunks);
+            Py_XDECREF(data);
             return NULL;
         }
         Py_CLEAR(res);
@@ -1810,6 +1811,13 @@ bufferedwriter_write(buffered *self, PyObject *args)
 
     CHECK_INITIALIZED(self)
     if (!PyArg_ParseTuple(args, "s*:write", &buf)) {
+        return NULL;
+    }
+    if (PyUnicode_Check(PyTuple_GET_ITEM(args, 0)) &&
+        PyErr_WarnPy3k("write() argument must be string or buffer, "
+                       "not 'unicode'", 1) < 0)
+    {
+        PyBuffer_Release(&buf);
         return NULL;
     }
 

@@ -304,7 +304,7 @@ I/O Base Classes
       Note that it's already possible to iterate on file objects using ``for
       line in file: ...`` without calling ``file.readlines()``.
 
-   .. method:: seek(offset[, whence])
+   .. method:: seek(offset, whence=SEEK_SET)
 
       Change the stream position to the given byte *offset*.  *offset* is
       interpreted relative to the position indicated by *whence*.  The default
@@ -724,7 +724,7 @@ Text I/O
 
       .. versionadded:: 2.7
 
-   .. method:: read(n)
+   .. method:: read(n=-1)
 
       Read and return at most *n* characters from the stream as a single
       :class:`unicode`.  If *n* is negative or ``None``, reads until EOF.
@@ -736,7 +736,7 @@ Text I/O
 
       If *limit* is specified, at most *limit* characters will be read.
 
-   .. method:: seek(offset[, whence])
+   .. method:: seek(offset, whence=SEEK_SET)
 
       Change the stream position to the given *offset*.  Behaviour depends on
       the *whence* parameter.  The default value for *whence* is
@@ -809,7 +809,7 @@ Text I/O
      the given string.
 
    If *line_buffering* is ``True``, :meth:`flush` is implied when a call to
-   write contains a newline character.
+   write contains a newline character or a carriage return.
 
    :class:`TextIOWrapper` provides one attribute in addition to those of
    :class:`TextIOBase` and its parents:
