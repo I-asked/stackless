@@ -258,6 +258,9 @@ def expanduser(path):
         i = len(path)
     if i == 1:
         if 'HOME' not in os.environ:
+            if sys.platform == 'psp':
+                return path
+
             import pwd
             try:
                 userhome = pwd.getpwuid(os.getuid()).pw_dir

@@ -3740,8 +3740,14 @@ then
 	*-*-psp*)
 		ac_sys_system=PSP
 		;;
+	*-vita-*)
+		ac_sys_system=Vita
+		;;
 	powerpc-unknown-eabi*)
 		ac_sys_system=Wii
+		;;
+	arm-none-eabi*)
+		ac_sys_system=N3DS
 		;;
 	*)
 		# for now, limit cross builds to known configurations
@@ -3792,7 +3798,13 @@ if test "$cross_compiling" = yes; then
 	*-*-psp*)
 		_host_cpu=$host_cpu
 		;;
+	*-vita-*)
+		_host_cpu=$host_cpu
+		;;
 	powerpc-unknown-eabi*)
+		_host_cpu=$host_cpu
+		;;
+	arm-none-eabi*)
 		_host_cpu=$host_cpu
 		;;
 	*)
@@ -4002,7 +4014,12 @@ else case e in #(
 	AIX*)   CC=${CC:-xlc_r}
 		without_gcc=;;
 	PSP)
-		LDFLAGS="$LDFLAGS -static"
+		CFLAGS="$CFLAGS -G0"
+		LDFLAGS="$LDFLAGS -static -G0"
+		LINKFORSHARED=" "
+	;;
+	Vita)
+		LDFLAGS="$LDFLAGS -static -lpthread"
 		LINKFORSHARED=" "
 	;;
 	Wii)
@@ -4011,6 +4028,13 @@ else case e in #(
 		LDFLAGS="$LDFLAGS -static"
 		LINKFORSHARED=" -mrvl "
 		LIBS="-L$DEVKITPRO/libogc/lib/wii $_arch_flags $LIBS -laesnd -lwiiuse -lbte -lwiikeyboard -logc"
+	;;
+	N3DS)
+		_arch_flags="-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft"
+		CFLAGS="$CFLAGS -D__3DS__ -D_3DS -DARM11 $_arch_flags -I$DEVKITPRO/libctru/include"
+		LDFLAGS="$LDFLAGS -static"
+		LINKFORSHARED=" $_arch_flags "
+		LIBS="-L$DEVKITPRO/libctru/lib -L$DEVKITPRO/devkitARM/arm-none-eabi/lib/armv6k/fpu/ $_arch_flags $LIBS -lpthread -lctru"
 	;;
 	BeOS*)
 		case $BE_HOST_CPU in
@@ -6550,11 +6574,11 @@ then
 		# debug builds.
 		OPT="-g -O0 -Wall $STRICT_PROTO"
 	    else
-		OPT="-g $WRAP -Oz -Wall $STRICT_PROTO"
+		OPT="-g $WRAP -Os -Wall $STRICT_PROTO"
 	    fi
 	    ;;
 	*)
-	    OPT="-Oz -Wall $STRICT_PROTO"
+	    OPT="-Os -Wall $STRICT_PROTO"
 	    ;;
 	esac
 	case $ac_sys_system in
@@ -9987,7 +10011,15 @@ then
 		LDCXXSHARED='$(CXX)'
 	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
 ;;
+	N3DS*)
+		LDSHARED='$(CC)'
+		LDCXXSHARED='$(CXX)'
+	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
+;;
 	PSP*)
+		LDSHARED='$(CC)'
+		LDCXXSHARED='$(CXX)';;
+	Vita*)
 		LDSHARED='$(CC)'
 		LDCXXSHARED='$(CXX)';;
 	*)
@@ -10035,7 +10067,9 @@ then
 		   esac;;
 	atheos*) CCSHARED="-fPIC";;
 	Wii*) CCSHARED="-fPIC";;
-	PSP*) CCSHARED="-fPIC";;
+	N3DS*) CCSHARED="-fPIC";;
+	PSP*) CCSHARED="";;
+	Vita*) CCSHARED="";;
 	esac
 fi
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $CCSHARED" >&5
@@ -12014,7 +12048,13 @@ then
 	PSP)
 		DYNLOADFILE="dynload_stub.o"
 		;;
+	Vita)
+		DYNLOADFILE="dynload_stub.o"
+		;;
 	Wii)
+		DYNLOADFILE="dynload_stub.o"
+		;;
+	N3DS)
 		DYNLOADFILE="dynload_stub.o"
 		;;
 	*)
@@ -12625,6 +12665,7 @@ fi
 
 # For some functions, having a definition is not sufficient, since
 # we want to take their address.
+if [ "$ac_sys_system" != "Vita" ] ; then :
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for chroot" >&5
 printf %s "checking for chroot... " >&6; }
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
@@ -13041,6 +13082,7 @@ printf "%s\n" "yes" >&6; }
 esac
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
 
 for ac_prog in true
 do

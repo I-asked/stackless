@@ -350,8 +350,14 @@ then
 	*-*-psp*)
 		ac_sys_system=PSP
 		;;
+	*-vita-*)
+		ac_sys_system=Vita
+		;;
 	powerpc-unknown-eabi*)
 		ac_sys_system=Wii
+		;;
+	arm-none-eabi*)
+		ac_sys_system=N3DS
 		;;
 	*)
 		# for now, limit cross builds to known configurations
@@ -402,7 +408,13 @@ if test "$cross_compiling" = yes; then
 	*-*-psp*)
 		_host_cpu=$host_cpu
 		;;
+	*-vita-*)
+		_host_cpu=$host_cpu
+		;;
 	powerpc-unknown-eabi*)
+		_host_cpu=$host_cpu
+		;;
+	arm-none-eabi*)
 		_host_cpu=$host_cpu
 		;;
 	*)
@@ -597,7 +609,12 @@ AC_ARG_WITH(gcc,
 	AIX*)   CC=${CC:-xlc_r}
 		without_gcc=;;
 	PSP)
-		LDFLAGS="$LDFLAGS -static"
+		CFLAGS="$CFLAGS -G0"
+		LDFLAGS="$LDFLAGS -static -G0"
+		LINKFORSHARED=" "
+	;;
+	Vita)
+		LDFLAGS="$LDFLAGS -static -lpthread"
 		LINKFORSHARED=" "
 	;;
 	Wii)
@@ -606,6 +623,13 @@ AC_ARG_WITH(gcc,
 		LDFLAGS="$LDFLAGS -static"
 		LINKFORSHARED=" -mrvl "
 		LIBS="-L$DEVKITPRO/libogc/lib/wii $_arch_flags $LIBS -laesnd -lwiiuse -lbte -lwiikeyboard -logc"
+	;;
+	N3DS)
+		_arch_flags="-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft"
+		CFLAGS="$CFLAGS -D__3DS__ -D_3DS -DARM11 $_arch_flags -I$DEVKITPRO/libctru/include"
+		LDFLAGS="$LDFLAGS -static"
+		LINKFORSHARED=" $_arch_flags "
+		LIBS="-L$DEVKITPRO/libctru/lib -L$DEVKITPRO/devkitARM/arm-none-eabi/lib/armv6k/fpu/ $_arch_flags $LIBS -lpthread -lctru"
 	;;
 	BeOS*)
 		case $BE_HOST_CPU in
@@ -1133,11 +1157,11 @@ then
 		# debug builds.
 		OPT="-g -O0 -Wall $STRICT_PROTO"
 	    else
-		OPT="-g $WRAP -Oz -Wall $STRICT_PROTO"
+		OPT="-g $WRAP -Os -Wall $STRICT_PROTO"
 	    fi
 	    ;;
 	*)
-	    OPT="-Oz -Wall $STRICT_PROTO"
+	    OPT="-Os -Wall $STRICT_PROTO"
 	    ;;
 	esac
 	case $ac_sys_system in
@@ -2331,7 +2355,15 @@ then
 		LDCXXSHARED='$(CXX)'
 	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
 ;;
+	N3DS*)
+		LDSHARED='$(CC)'
+		LDCXXSHARED='$(CXX)'
+	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
+;;
 	PSP*)
+		LDSHARED='$(CC)'
+		LDCXXSHARED='$(CXX)';;
+	Vita*)
 		LDSHARED='$(CC)'
 		LDCXXSHARED='$(CXX)';;
 	*)
@@ -2377,7 +2409,9 @@ then
 		   esac;;
 	atheos*) CCSHARED="-fPIC";;
 	Wii*) CCSHARED="-fPIC";;
-	PSP*) CCSHARED="-fPIC";;
+	N3DS*) CCSHARED="-fPIC";;
+	PSP*) CCSHARED="";;
+	Vita*) CCSHARED="";;
 	esac
 fi
 AC_MSG_RESULT($CCSHARED)
@@ -3138,7 +3172,13 @@ then
 	PSP)
 		DYNLOADFILE="dynload_stub.o"
 		;;
+	Vita)
+		DYNLOADFILE="dynload_stub.o"
+		;;
 	Wii)
+		DYNLOADFILE="dynload_stub.o"
+		;;
+	N3DS)
 		DYNLOADFILE="dynload_stub.o"
 		;;
 	*)
@@ -3190,6 +3230,7 @@ AC_CHECK_FUNCS(alarm setitimer getitimer bind_textdomain_codeset chown \
 
 # For some functions, having a definition is not sufficient, since
 # we want to take their address.
+if [[ "$ac_sys_system" != "Vita" ]] ; then :
 AC_MSG_CHECKING(for chroot)
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <unistd.h>]], [[void *x=chroot]])],
   [AC_DEFINE(HAVE_CHROOT, 1, Define if you have the 'chroot' function.)
@@ -3292,6 +3333,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
   [AC_DEFINE(HAVE_BROKEN_UNSETENV, 1, Define if `unsetenv` does not return an int.)
    AC_MSG_RESULT(yes)
 ])
+fi
 
 dnl check for true
 AC_CHECK_PROGS(TRUE, true, /bin/true)

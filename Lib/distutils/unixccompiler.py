@@ -180,7 +180,22 @@ class UnixCCompiler(CCompiler):
                     linker = self.linker_exe[:]
                 else:
                     linker = self.linker_so[:]
-                    ld_args.extend(['-mrvl', 'main.c', '-L.', '-lpython2.7', '-lm', '-L/opt/devkitpro/libogc/lib/wii', '-logc'])
+                    compiler = os.path.basename(sysconfig.get_config_var("CC"))
+
+                    ld_args = [arg for arg in ld_args if 'devkitpro' not in arg]
+
+                    dkp = os.environ['DEVKITPRO']
+
+                    ld_args.extend(['main.c'])
+                    if 'powerpc-eabi-' in compiler:
+                        ld_args.extend(['-mrvl', '-L'+dkp+'/lib/wii', '-L'+dkp+'/portlibs/ppc', '-logc'])
+                    if 'arm-none-eabi' in compiler:
+                        ld_args.extend('-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -L'+dkp+'/libctru/lib -L'+dkp+'/portlibs/3ds/lib -L'+dkp+'/devkitARM/arm-none-eabi/lib/armv6k/fpu -lpthread -lctru'.split())
+                    if 'vita-' in compiler:
+                        ld_args.extend(['-lpthread'])
+                    if 'psp-' in compiler:
+                        pass
+                    ld_args.extend(['-L.', '-lpython2.7', '-lm'])
                 if target_lang == "c++" and self.compiler_cxx:
                     # skip over environment variable settings if /usr/bin/env
                     # is used to set up the linker's environment.
